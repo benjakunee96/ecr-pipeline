@@ -6,6 +6,7 @@
 
 aws_region = "ap-southeast-1"
 #user for ecr
+#AmazonEC2ContainerRegistryFullAccess
 access_key = ""
 secret_key = ""
 
