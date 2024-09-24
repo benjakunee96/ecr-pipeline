@@ -3,7 +3,10 @@ pipeline {
     tools {
         maven 'maven'
     }
-    
+    environment {
+        registry = '017820697088.dkr.ecr.ap-southeast-1.amazonaws.com/ecr-pipeline-image'
+        imageTag = 'latest'
+    }
     stages {
         stage ("Check the project") {
             steps {
@@ -13,6 +16,20 @@ pipeline {
         stage ("Compile and Run the Sonar Analysis") {
             steps {
                 sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=devsec-test -Dsonar.organization=benjakunee96 -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=0f2d56b7d2a20102f7b8ba40fc9490e32bef1d19'
+            }
+        }
+        stage ('RunSCAAnalysis') {
+            steps {
+                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+                    sh 'mvn snyk:test -fn'
+                }
+            }
+        }
+            stage ("Building our image") {
+                steps {
+                    script {
+                        dockerImage = docker.build("${registry}:${imageTag}-$BUILD_NUMBER")
+                }
             }
         }
     }
