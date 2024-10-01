@@ -1,3 +1,4 @@
+//1/10/2024
 pipeline {
     agent any
     tools {
@@ -6,6 +7,7 @@ pipeline {
     environment {
         registry = '017820697088.dkr.ecr.ap-southeast-1.amazonaws.com/ecr-pipeline-image'
         imageTag = 'latest'
+        registryCredential = 'jenkins-ecr-login-1'
     }
     stages {
         stage ("Check the project") {
@@ -18,17 +20,36 @@ pipeline {
                 sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=devsec-test -Dsonar.organization=benjakunee96 -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=0f2d56b7d2a20102f7b8ba40fc9490e32bef1d19'
             }
         }
-        stage ('RunSCAAnalysis') {
+        stage ('Run SCA Analysis') {
             steps {
                 withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
                     sh 'mvn snyk:test -fn'
                 }
             }
         }
-            stage ("Building our image") {
-                steps {
-                    script {
-                        dockerImage = docker.build("${registry}:${imageTag}-$BUILD_NUMBER")
+        stage ("Build Docker image") {
+            steps {
+                script {
+                    dockerImage = docker.build("${registry}:${imageTag}-$BUILD_NUMBER")
+                }
+            }
+        }
+        stage('Login to AWS ECR') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        // Login to ECR using the provided command
+                        sh 'aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 017820697088.dkr.ecr.ap-southeast-1.amazonaws.com'
+                    }
+                }
+            }
+        }
+        stage('Push Docker image to AWS ECR') {
+            steps {
+                script {
+                    docker.withRegistry("https://${registry}", registryCredential) {
+                        dockerImage.push()
+                    }
                 }
             }
         }
